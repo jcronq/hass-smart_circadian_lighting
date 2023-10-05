@@ -1,30 +1,6 @@
 """
 Circadian Lighting Component for Home-Assistant.
 
-This component calculates color temperature and brightness to synchronize
-your color changing lights with perceived color temperature of the sky throughout
-the day. This gives your environment a more natural feel, with cooler whites during
-the midday and warmer tints near twilight and dawn.
-
-In addition, the component sets your lights to a nice warm white at 1% in "Sleep" mode,
-which is far brighter than starlight but won't reset your circadian rhythm or break down
-too much rhodopsin in your eyes.
-
-Human circadian rhythms are heavily influenced by ambient light levels and
-hues. Hormone production, brainwave activity, mood and wakefulness are
-just some of the cognitive functions tied to cyclical natural light.
-http://en.wikipedia.org/wiki/Zeitgeber
-
-Here's some further reading:
-
-http://www.cambridgeincolour.com/tutorials/sunrise-sunset-calculator.htm
-http://en.wikipedia.org/wiki/Color_temperature
-
-Technical notes: I had to make a lot of assumptions when writing this app
-    *   There are no considerations for weather or altitude, but does use your
-        hub's location to calculate the sun position.
-    *   The component doesn't calculate a true "Blue Hour" -- it just sets the
-        lights to 2700K (warm white) until your hub goes into Night mode
 """
 
 import asyncio
@@ -58,7 +34,7 @@ from homeassistant.util.color import (
     color_xy_to_hs,
 )
 
-DOMAIN = "circadian_lighting"
+DOMAIN = "smart_circadian_lighting"
 CIRCADIAN_LIGHTING_UPDATE_TOPIC = f"{DOMAIN}_update"
 SUN_EVENT_NOON = "solar_noon"
 SUN_EVENT_MIDNIGHT = "solar_midnight"
@@ -90,9 +66,7 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_LONGITUDE): cv.longitude,
                 vol.Optional(CONF_ELEVATION): float,
                 vol.Optional(CONF_INTERVAL, default=DEFAULT_INTERVAL): cv.time_period,
-                vol.Optional(
-                    ATTR_TRANSITION, default=DEFAULT_TRANSITION
-                ): VALID_TRANSITION,
+                vol.Optional(ATTR_TRANSITION, default=DEFAULT_TRANSITION): VALID_TRANSITION,
             }
         ),
     },
@@ -117,9 +91,7 @@ async def async_setup(hass, config) -> bool:
         transition=conf.get(ATTR_TRANSITION),
     )
     await hass.data[DOMAIN]._async_init(interval=conf.get(CONF_INTERVAL))
-    hass.async_create_task(
-        async_load_platform(hass, "sensor", DOMAIN, {}, config)
-    )
+    hass.async_create_task(async_load_platform(hass, "sensor", DOMAIN, {}, config))
 
     return True
 
@@ -243,9 +215,7 @@ class CircadianLighting:
             SUN_EVENT_MIDNIGHT: solar_midnight,
         }
 
-        return {
-            k: dt.astimezone(dt_util.UTC).timestamp() for k, dt in datetimes.items()
-        }
+        return {k: dt.astimezone(dt_util.UTC).timestamp() for k, dt in datetimes.items()}
 
     async def _async_relevant_events(self, now):
         events = []
@@ -271,22 +241,14 @@ class CircadianLighting:
             h = today[SUN_EVENT_NOON]
             k = 100
             # parabola before solar_noon else after solar_noon
-            x = (
-                today[SUN_EVENT_SUNRISE]
-                if now_ts < today[SUN_EVENT_NOON]
-                else today[SUN_EVENT_SUNSET]
-            )
+            x = today[SUN_EVENT_SUNRISE] if now_ts < today[SUN_EVENT_NOON] else today[SUN_EVENT_SUNSET]
 
         # sunset -> sunrise parabola
         elif today[SUN_EVENT_SUNSET] < now_ts < today[SUN_EVENT_SUNRISE]:
             h = today[SUN_EVENT_MIDNIGHT]
             k = -100
             # parabola before solar_midnight else after solar_midnight
-            x = (
-                today[SUN_EVENT_SUNSET]
-                if now_ts < today[SUN_EVENT_MIDNIGHT]
-                else today[SUN_EVENT_SUNRISE]
-            )
+            x = today[SUN_EVENT_SUNSET] if now_ts < today[SUN_EVENT_MIDNIGHT] else today[SUN_EVENT_SUNRISE]
 
         y = 0
         a = (y - k) / (h - x) ** 2
